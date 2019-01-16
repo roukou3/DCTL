@@ -1,0 +1,187 @@
+/*
+  Fisheye correction for Meike 6.5 mm F/2.0 in DCTL
+*/
+
+DEFINE_UI_PARAMS(CIRCLE_ADJ,   adjustment mode,  DCTLUI_CHECK_BOX, 1)
+DEFINE_UI_PARAMS(CIRCLE_CENTX, adjust:center x, DCTLUI_SLIDER_FLOAT,  0.0,   -1.0,  1.0, 0.01) //-0.1
+DEFINE_UI_PARAMS(CIRCLE_CENTY, adjust: enter y, DCTLUI_SLIDER_FLOAT,  0.0,   -1.0,  1.0, 0.01) //-0.7
+DEFINE_UI_PARAMS(CIRCLE_RAD,   adjust:radius,   DCTLUI_SLIDER_FLOAT, 34.2,   25.0, 50.0, 0.01)
+DEFINE_UI_PARAMS(PIX_ASPECT,   adjust:aspect,   DCTLUI_SLIDER_FLOAT,  1.0,    1.0,  2.0, 0.01)
+DEFINE_UI_PARAMS(FOCAL_LENGTH, focal length log2,DCTLUI_SLIDER_FLOAT, 2.3219, 2.0,  5.0, 0.1)
+DEFINE_UI_PARAMS(INTERP,       use bicubic,      DCTLUI_CHECK_BOX, 1)
+
+DEFINE_UI_PARAMS(EQUIRECT,     equirentangular map,  DCTLUI_CHECK_BOX, 0)
+DEFINE_UI_PARAMS(HIDE_OUTSIDE, hide outside of circle,  DCTLUI_CHECK_BOX, 0)
+
+DEFINE_UI_PARAMS(ANGLE_PAN,    pan,     DCTLUI_SLIDER_FLOAT,  0.0, -180.0, 180.0, 0.1)
+DEFINE_UI_PARAMS(ANGLE_TILT,   tilt,    DCTLUI_SLIDER_FLOAT,  0.0, -180.0, 180.0, 0.1)
+DEFINE_UI_PARAMS(ANGLE_ROTATE, rotate,  DCTLUI_SLIDER_FLOAT,  0.0, -180.0, 180.0, 0.1)
+
+DEFINE_UI_PARAMS(DEFISH_RATE, defish rate,  DCTLUI_SLIDER_FLOAT, 100.0,   0.0, 100.0, 1.0)
+
+#define SensorWidth (36.0)
+
+#define PI (3.14159265)
+__DEVICE__ float radian(const float degree){
+  return _fdivide(degree, 180) * PI;
+}
+__DEVICE__ float degree(const float radian){
+  return _fdivide(radian, PI) * 180;
+}
+
+#define MeikeC1 ( 1.2160696041)
+#define MeikeC2 ( 0.3219589783)
+#define MeikeC3 (-0.5458724174)
+#define MeikeTH (95.0)
+__DEVICE__ float theta2radius(const float theta){
+  const float x = _saturatef(_fdivide(degree(theta), MeikeTH));
+  return _fmaf(_fmaf(MeikeC3, x, MeikeC2), x, MeikeC1) * x;
+}
+
+__DEVICE__ float bicubic_h(const float t){
+  const float x = _fabs(t);
+  if(x <= 1){
+    return (x-1)*(x*(x-1)-1);
+  }else if(x <= 2){
+    return -(x-1)*(x-2)*(x-2);
+  }
+  return 0.0;
+}
+
+__DEVICE__ float2 rotate2(const float2 vector, const float angle_rad){
+  float2 out;
+  const float cos = _cosf(angle_rad);
+  const float sin = _sinf(angle_rad);
+  out.x = _fmaf(vector.x, cos, - vector.y * sin);
+  out.y = _fmaf(vector.x, sin,   vector.y * cos);
+  return out;
+}
+
+__DEVICE__ float3 pan_tilt_rotate(float3 xyz_in, float3 angles_in_degree){
+  float3 xyz = xyz_in;
+  float2 temp;
+  temp = rotate2(make_float2(xyz.x, xyz.y), radian(angles_in_degree.z));//rotate
+  xyz.x = temp.x;
+  xyz.y = temp.y;
+  temp = rotate2(make_float2(xyz.y, xyz.z), radian(angles_in_degree.y));//tilt
+  xyz.y = temp.x;
+  xyz.z = temp.y;
+  temp = rotate2(make_float2(xyz.x, xyz.z), radian(angles_in_degree.x));//pan
+  xyz.x = temp.x;
+  xyz.z = temp.y;
+  return xyz;
+}
+
+__DEVICE__ float _tex2D_bicubic(const __TEXTURE__ p_Tex, const float pX, const float pY){
+  const float iX = _floor(pX);
+  const float iY = _floor(pY);
+  const float dX = pX - iX;
+  const float dY = pY - iY;
+  const float vecX[] = {1 + dX, dX, 1 - dX, 2 - dX};
+  const float vecY[] = {1 + dY, dY, 1 - dY, 2 - dY};
+
+  float sum = 0;
+  float coef = 0;
+  for(int i = 0; i < 4; i++){
+    float hX = bicubic_h(vecX[i]);
+    for(int j = 0; j < 4; j++){
+      float hY = bicubic_h(vecY[j]);
+      sum += hY * _tex2D(p_Tex, iX + i - 1, iY + j -1) * hX;
+      coef += hY * hX;
+    }
+  }
+  return _fdivide(sum, coef);
+}
+
+__DEVICE__ float _tex2D_bilinear(const __TEXTURE__ p_Tex, const float pX, const float pY){
+  const float iX = _floor(pX);
+  const float iY = _floor(pY);
+  const float dX = pX - iX;
+  const float dY = pY - iY;
+  const float vecX[] = {1 - dX, dX};
+  const float vecY[] = {1 - dY, dY};
+
+  float sum = 0;
+  for(int i = 0; i < 2; i++){
+    for(int j = 0; j < 2; j++){
+      sum += vecY[j] * _tex2D(p_Tex, iX+i, iY+j) * vecX[i];
+    }
+  }
+  return sum;
+}
+
+__DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTURE__ p_TexR, __TEXTURE__ p_TexG, __TEXTURE__ p_TexB)
+{
+  float pX = p_X;
+  float pY = p_Y;
+  const float pWidth = p_Width;
+  const float pHeight = p_Height;
+
+  const float scale = _fmaxf(pWidth, pHeight);
+  const float half_w = _fdivide(pWidth,  2);
+  const float half_h = _fdivide(pHeight, 2);
+  const float sX = _fdivide(p_X - half_w, scale);
+  const float sY = _fdivide(p_Y - half_h, scale);
+
+  const float centX = _fdivide(CIRCLE_CENTX, 100);
+  const float centY = _fdivide(CIRCLE_CENTY, 100);
+  const float centR = _fdivide(CIRCLE_RAD,   100);
+  const float focalL = _exp2f(FOCAL_LENGTH);
+
+  if(CIRCLE_ADJ){
+    const float rad = _hypotf(_fdivide(sX - centX, PIX_ASPECT), sY - centY);
+    const float flag = _fminf(_fminf(_fabs(sX - centX), _fabs(sY - centY)), _fabs(rad - centR));
+    if(flag * scale <= 2.0) return make_float3(1.0, 0, 0);
+  }else{
+    float3 xyz;
+    if(EQUIRECT){
+      // (eq_theta, eq_phi) -> space (x,y,z)
+      const float eq_phi   = sX * 2 * PI;
+      const float eq_theta = (sY * 2 + 0.5) * PI;
+      xyz.z = _sinf(eq_theta) * _cosf(eq_phi);
+      xyz.x = - _sinf(eq_theta) * _sinf(eq_phi);
+      xyz.y = - _cosf(eq_theta);
+    }else{
+      // film plane (sX,sY) -> space (x,y,z)
+      xyz.z = _fdivide(focalL, SensorWidth);
+      xyz.x = - sX;
+      xyz.y =   sY;
+    }
+
+    xyz = pan_tilt_rotate(xyz, make_float3(ANGLE_PAN, ANGLE_TILT, ANGLE_ROTATE));
+
+    // space (x,y,z) to angle (theta, phi)
+    const float theta = _acosf(_fdivide(xyz.z, _hypotf(_hypotf(xyz.x, xyz.y), xyz.z)));
+    const float phi = _copysignf(_acosf(_clampf(_fdivide(xyz.x, _hypotf(xyz.x, xyz.y)), -1.0, 1.0)), xyz.y);
+
+    // angle (theta, phi) -> fisheye plane (pic_x, pic_y)
+    const float radius = theta2radius(theta) * centR;
+    const float pic_x = _fmaf(- _cosf(phi), radius * PIX_ASPECT, centX);
+    const float pic_y = _fmaf(  _sinf(phi), radius, centY);
+
+    pX = _fmaf(pic_x, scale, half_w);
+    pY = _fmaf(pic_y, scale, half_h);
+
+    float transf = _fdivide(100 - DEFISH_RATE, 100);
+    pX += (p_X - pX) * transf;
+    pY += (p_Y - pY) * transf;
+
+    if(HIDE_OUTSIDE){
+      if(degree(theta) > MeikeTH || pX < 0.0 || pX > pWidth || pY < 0.0 || pY > pHeight){
+        return make_float3(0.0, 0.0, 0.0);
+      }
+    }
+  }
+
+  float3 rgb;
+  if(INTERP & !CIRCLE_ADJ){
+    rgb.x = _tex2D_bicubic(p_TexR, pX, pY);
+    rgb.y = _tex2D_bicubic(p_TexG, pX, pY);
+    rgb.z = _tex2D_bicubic(p_TexB, pX, pY);
+  }else{
+    rgb.x = _tex2D(p_TexR, _round(pX), _round(pY));
+    rgb.y = _tex2D(p_TexG, _round(pX), _round(pY));
+    rgb.z = _tex2D(p_TexB, _round(pX), _round(pY));
+  }
+  return rgb;
+}
