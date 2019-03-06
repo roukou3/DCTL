@@ -23,19 +23,22 @@ DEFINE_UI_PARAMS(DEFISH_RATE, defish rate,  DCTLUI_SLIDER_FLOAT, 100.0,   0.0, 1
 
 #define PI (3.14159265)
 __DEVICE__ float radian(const float degree){
-  return _fdivide(degree, 180) * PI;
+  const float _t = 180;
+  return _fdivide(degree, _t) * PI;
 }
 __DEVICE__ float degree(const float radian){
-  return _fdivide(radian, PI) * 180;
+  const float _t = PI;
+  return _fdivide(radian, _t) * 180;
 }
 
-#define MeikeC1 ( 1.2160696041)
-#define MeikeC2 ( 0.3219589783)
-#define MeikeC3 (-0.5458724174)
-#define MeikeTH (95.0)
+#define maxTH (95.0);
 __DEVICE__ float theta2radius(const float theta){
-  const float x = _saturatef(_fdivide(degree(theta), MeikeTH));
-  return _fmaf(_fmaf(MeikeC3, x, MeikeC2), x, MeikeC1) * x;
+  const float C1 =  1.2160696041;
+  const float C2 =  0.3219589783;
+  const float C3 = -0.5458724174;
+  const float TH = maxTH;
+  const float x = _saturatef(degree(theta) / TH);
+  return _fmaf(_fmaf(C3, x, C2), x, C1) * x;
 }
 
 __DEVICE__ float2 rotate2(const float2 vector, const float angle_rad){
@@ -143,7 +146,8 @@ __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTU
       xyz.y = - _cosf(eq_theta);
     }else{
       // film plane (sX,sY) -> space (x,y,z)
-      xyz.z = _fdivide(focalL, SensorWidth);
+      const float _sw = SensorWidth;
+      xyz.z = _fdivide(focalL, _sw);
       xyz.x = - sX;
       xyz.y =   sY;
     }
@@ -151,8 +155,12 @@ __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTU
     xyz = pan_tilt_rotate(xyz, make_float3(ANGLE_PAN, ANGLE_TILT, ANGLE_ROTATE));
 
     // space (x,y,z) to angle (theta, phi)
-    const float theta = _acosf(_fdivide(xyz.z, _hypotf(_hypotf(xyz.x, xyz.y), xyz.z)));
-    const float phi = _copysignf(_acosf(_clampf(_fdivide(xyz.x, _hypotf(xyz.x, xyz.y)), -1.0, 1.0)), xyz.y);
+    const float _z = _hypotf(_hypotf(xyz.x, xyz.y), xyz.z);
+    const float theta = _acosf(_fdivide(xyz.z, _z));
+    const float _x = _hypotf(xyz.x, xyz.y);
+    const float _cn = -1;
+    const float _cp =  1;
+    const float phi = _copysignf(_acosf(_clampf(_fdivide(xyz.x, _x), _cn, _cp)), xyz.y);
 
     // angle (theta, phi) -> fisheye plane (pic_x, pic_y)
     const float radius = theta2radius(theta) * centR;
@@ -167,7 +175,8 @@ __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTU
     pY += (p_Y - pY) * transf;
 
     if(HIDE_OUTSIDE){
-      if(degree(theta) > MeikeTH || pX < 0.0 || pX > pWidth || pY < 0.0 || pY > pHeight){
+      const float th = maxTH;
+      if(degree(theta) > th || pX < 0.0 || pX > pWidth || pY < 0.0 || pY > pHeight){
         return make_float3(0.0, 0.0, 0.0);
       }
     }
