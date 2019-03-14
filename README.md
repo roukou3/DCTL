@@ -21,6 +21,9 @@ DCTL is the DaVinci Color Transform Language (DCTL) that runs on Blackmagic Desi
 2. Copy the DCTL file to the directory.
 3. Reboot DaVinci Resolve.
 
+* On macOS, there is a problem with GPU compatibility (metal). Please try below if the DCTL doesn't work.
+    * Preferences-> Configuration -> GPU processing mode-> Changed from "Auto" to "OpenCL"
+
 ## Usage
 
 ### Basic
