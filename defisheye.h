@@ -99,3 +99,26 @@ __DEVICE__ float3 text2D_RGB(const float pX, const float pY, __TEXTURE__ p_TexR,
   return rgb;
 }
 
+__DEVICE__ float3 equirect_angel2space(const float2 eq_thetaphi){
+  const float theta = eq_thetaphi.x;
+  const float phi   = eq_thetaphi.y;
+  float3 xyz;
+  xyz.z = _sinf(theta) * _cosf(phi);
+  xyz.x = - _sinf(theta) * _sinf(phi);
+  xyz.y = - _cosf(theta);
+  return xyz;
+}
+
+__DEVICE__ float2 space2angle(const float3 xyz){
+  float2 thetaphi;
+  const float _z = _hypotf(_hypotf(xyz.x, xyz.y), xyz.z);
+  const float theta = _acosf(_fdivide(xyz.z, _z));
+  const float _x = _hypotf(xyz.x, xyz.y);
+  const float _cn = -1;
+  const float _cp =  1;
+  const float phi = _copysignf(_acosf(_clampf(_fdivide(xyz.x, _x), _cn, _cp)), xyz.y);
+  thetaphi.x = theta;
+  thetaphi.y = phi;
+  return thetaphi;
+}
+
