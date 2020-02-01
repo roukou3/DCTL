@@ -1,12 +1,17 @@
-Fisheye correction for Meike 6.5 mm F/2.0 in DCTL
+Fisheye correction in DCTL
 ====
 
 ## Description
 
-This is DCTL which can make precise correction of the fisheye lens - Meike 6.5mm F/2.0.
+This is DCTL which can make correction of the fisheye lens.
 You can convert fisheye video to ultra wide angle video.
 
 DCTL is the DaVinci Color Transform Language (DCTL) that runs on Blackmagic Design's DaVinci Resolve Studio.
+
+Supported Lenses:
+- Meike 6.5 mm F/2.0
+- Laowa 4.0 mm F/2.8 - not enough precision
+- [PTGui 11](https://wiki.panotools.org/Fisheye_Projection) - The fisheye factor k can model any possible fisheye. 
 
 ## Demo
 
@@ -30,7 +35,7 @@ DCTL is the DaVinci Color Transform Language (DCTL) that runs on Blackmagic Desi
 
 1. On the Resolve Color page, drag and drop DCTL filter to color node.
     * DCTL is in OpenFX -> ResolveFX Color -> DCTL.
-2. Choose "Meike_6.5mm_f2.0.dctl" in DCTL List.
+2. Choose the added DCTL file in DCTL List.
 
 ### Parameters
 
