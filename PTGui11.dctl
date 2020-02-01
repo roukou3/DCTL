@@ -1,0 +1,121 @@
+/*
+  Fisheye correction using PTGui function in DCTL
+  PTGui 11 fisheye https://wiki.panotools.org/Fisheye_Projection
+*/
+
+#include "defisheye.h"
+
+DEFINE_UI_PARAMS(CIRCLE_ADJ,   adjustment mode,  DCTLUI_CHECK_BOX, 1)
+DEFINE_UI_PARAMS(CIRCLE_CENTX, adjust:center x, DCTLUI_SLIDER_FLOAT,  0.0,   -2.0,  2.0, 0.01) //-0.1
+DEFINE_UI_PARAMS(CIRCLE_CENTY, adjust:center y, DCTLUI_SLIDER_FLOAT,  0.0,   -2.0,  2.0, 0.01) //-0.7
+DEFINE_UI_PARAMS(CIRCLE_RAD,   adjust:radius,   DCTLUI_SLIDER_FLOAT, 29.0,   0.0, 75.0, 0.01)
+DEFINE_UI_PARAMS(PIX_ASPECT,   adjust:aspect,   DCTLUI_SLIDER_FLOAT,  1.0,    1.0,  2.0, 0.01)
+DEFINE_UI_PARAMS(FOCAL_LENGTH, focal length log2,DCTLUI_SLIDER_FLOAT, 2.322,  2.0,  5.0, 0.1) //2^2.322=5mm
+DEFINE_UI_PARAMS(INTERP,       use bicubic,      DCTLUI_CHECK_BOX, 1)
+
+DEFINE_UI_PARAMS(EQUIRECT,     equirentangular map,  DCTLUI_CHECK_BOX, 0)
+DEFINE_UI_PARAMS(HIDE_OUTSIDE, hide outside of circle,  DCTLUI_CHECK_BOX, 0)
+
+DEFINE_UI_PARAMS(ANGLE_PAN,    pan,     DCTLUI_SLIDER_FLOAT,  0.0, -180.0, 180.0, 0.1)
+DEFINE_UI_PARAMS(ANGLE_TILT,   tilt,    DCTLUI_SLIDER_FLOAT,  0.0, -180.0, 180.0, 0.1)
+DEFINE_UI_PARAMS(ANGLE_ROTATE, rotate,  DCTLUI_SLIDER_FLOAT,  0.0, -180.0, 180.0, 0.1)
+
+DEFINE_UI_PARAMS(DEFISH_RATE, defish rate,  DCTLUI_SLIDER_FLOAT, 100.0,   0.0, 100.0, 1.0)
+
+DEFINE_UI_PARAMS(ANGLE_PAN2,    pan 2,     DCTLUI_SLIDER_FLOAT,  0.0, -180.0, 180.0, 0.1)
+DEFINE_UI_PARAMS(ANGLE_TILT2,   tilt 2,    DCTLUI_SLIDER_FLOAT,  0.0, -180.0, 180.0, 0.1)
+DEFINE_UI_PARAMS(ANGLE_ROTATE2, rotate 2,  DCTLUI_SLIDER_FLOAT,  0.0, -180.0, 180.0, 0.1)
+
+DEFINE_UI_PARAMS(HIDE_OUTSIDE_DEGREE, hide outside in degree, DCTLUI_SLIDER_FLOAT,  180.0, 90.0, 360.0, 1.0)
+
+DEFINE_UI_PARAMS(DEFISH_DEGREE, degree of circle edge, DCTLUI_SLIDER_FLOAT,  180.0, 160.0, 240.0, 0.5)
+DEFINE_UI_PARAMS(DEFISH_COEF_K, defish coef k,      DCTLUI_SLIDER_FLOAT,  0.0, -1.0, 0.99, 0.01)
+
+#define SensorWidth (36.0)
+
+// r = 1.0 at theta eq theta_max
+__DEVICE__ float theta2radius(const float theta, const float theta_max, const float k){
+  const float x = _fminf(k * theta, _fdivide(PI, 2));
+  const float y = k * theta_max;
+  if (k > 0){
+    return _tanf(x) / _tanf(y);
+  }else if(k < 0){
+    return _sinf(x) / _sinf(y);
+  }
+  return theta / theta_max;
+}
+
+__DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTURE__ p_TexR, __TEXTURE__ p_TexG, __TEXTURE__ p_TexB)
+{
+  float pX = p_X;
+  float pY = p_Y;
+  const float pWidth = p_Width;
+  const float pHeight = p_Height;
+
+  const float scale = _fmaxf(pWidth, pHeight);
+  const float half_w = _fdivide(pWidth,  2);
+  const float half_h = _fdivide(pHeight, 2);
+  const float sX = _fdivide(p_X - half_w, scale);
+  const float sY = _fdivide(p_Y - half_h, scale);
+
+  const float centX = _fdivide(CIRCLE_CENTX, 100);
+  const float centY = _fdivide(CIRCLE_CENTY, 100);
+  const float centR = _fdivide(CIRCLE_RAD,   100);
+  const float focalL = _exp2f(FOCAL_LENGTH);
+
+  if(CIRCLE_ADJ){
+    const float rad = _hypotf(_fdivide(sX - centX, PIX_ASPECT), sY - centY);
+    const float flag = _fminf(_fminf(_fabs(sX - centX), _fabs(sY - centY)), _fabs(rad - centR));
+    if(flag * scale <= 2.0) return make_float3(1.0, 0, 0);
+  }else{
+    float3 xyz;
+    if(EQUIRECT){
+      // (eq_theta, eq_phi) -> space (x,y,z)
+      float2 eq_thetaphi;
+      eq_thetaphi.x = (sY * 2 + 0.5) * PI;
+      eq_thetaphi.y = sX * 2 * PI;
+      xyz = equirect_angel2space(eq_thetaphi);
+    }else{
+      // film plane (sX,sY) -> space (x,y,z)
+      const float _sw = SensorWidth;
+      xyz.z = _fdivide(focalL, _sw);
+      xyz.x = - sX;
+      xyz.y =   sY;
+      xyz = pan_tilt_rotate(xyz, make_float3(ANGLE_PAN2, ANGLE_TILT2, ANGLE_ROTATE2));
+    }
+
+    xyz = pan_tilt_rotate(xyz, make_float3(ANGLE_PAN, ANGLE_TILT, ANGLE_ROTATE));
+
+    // space (x,y,z) to angle (theta, phi)
+    float2 thetaphi = space2angle(xyz);
+    const float theta = thetaphi.x;
+    const float phi = thetaphi.y;
+
+    // angle (theta, phi) -> fisheye plane (pic_x, pic_y)
+    const float radius = theta2radius(theta, radian(_fdivide(DEFISH_DEGREE, 2)), DEFISH_COEF_K) * centR;
+    const float pic_x = _fmaf(- _cosf(phi), radius * PIX_ASPECT, centX);
+    const float pic_y = _fmaf(  _sinf(phi), radius, centY);
+
+    pX = _fmaf(pic_x, scale, half_w);
+    pY = _fmaf(pic_y, scale, half_h);
+
+    const float transf = _fdivide(100 - DEFISH_RATE, 100);
+    pX += (p_X - pX) * transf;
+    pY += (p_Y - pY) * transf;
+
+    if(HIDE_OUTSIDE){
+      const float th = _fdivide(HIDE_OUTSIDE_DEGREE, 2.0);
+      if(degree(theta) > th || pX < 0.0 || pX > pWidth || pY < 0.0 || pY > pHeight){
+        return make_float3(0.0, 0.0, 0.0);
+      }
+    }
+  }
+
+  float3 rgb;
+  if(INTERP & !CIRCLE_ADJ){
+    rgb = text2D_bicubicRGB(pX, pY, p_TexR, p_TexG, p_TexB);
+  }else{
+    rgb = text2D_RGB(pX, pY, p_TexR, p_TexG, p_TexB);
+  }
+  return rgb;
+}
