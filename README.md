@@ -11,7 +11,7 @@ DCTL is the DaVinci Color Transform Language (DCTL) that runs on Blackmagic Desi
 Supported Lenses:
 - Meike 6.5 mm F/2.0
 - Laowa 4.0 mm F/2.8 - not enough precision
-- [PTGui 11](https://wiki.panotools.org/Fisheye_Projection) - The fisheye factor k can model any possible fisheye. 
+- Any - [PTGui 11](https://wiki.panotools.org/Fisheye_Projection) - The fisheye factor k can model any possible fisheye. 
 
 ## Demo
 
