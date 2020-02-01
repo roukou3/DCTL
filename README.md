@@ -39,13 +39,15 @@ DCTL is the DaVinci Color Transform Language (DCTL) that runs on Blackmagic Desi
 * focal length log2 - Specify the logarithmic value of the full-size equivalent focal length. For example, 5 mm is 2.3219. The reason for logarithm is to zoom in smoothly.
 * pan, tilt, rotate - Adjust the camera's 3 axes.
 * defish rate - Deform continuously before and after fisheye correction.
+* pan 2, tilt 2, rotate 2 - Additional camera's 3 axes for camera move.
 * use bicubic - Apply bi-cubic interpolation.
 * equirectangular map - Convert into an equirectangular projection. By setting the timeline resolution to 2:1, you can easily create 360 format video.
 * hide outside of circle - Mask the corresponding image on the outside of the image circle.
+* hide outside in degree - Adjust angle for masking.
 
 ## Requirement
 
-Blackmagic Design DaVinci Resolve Studio 15
+Blackmagic Design DaVinci Resolve Studio 16
 
 DCTL does not work with free version of DaVinci Resolve.
 
