@@ -13,7 +13,7 @@ Supported Lenses:
 - Laowa 4.0 mm F/2.8 - not enough precision
 - Any - [PTGui 11](https://wiki.panotools.org/Fisheye_Projection) - The fisheye factor k can model any possible fisheye. 
 
-## Demo
+## Demonstration
 
 [Corrected video samples](https://www.youtube.com/playlist?list=PLsqEeiE8zVJUeSfI9roCVS3D1I04Xmk4k)
 
