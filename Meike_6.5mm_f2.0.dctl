@@ -98,7 +98,7 @@ __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTU
     pY += (p_Y - pY) * transf;
 
     if(HIDE_OUTSIDE){
-      const float th = _fdivide(HIDE_OUTSIDE_DEGREE, 2.0);
+      const float th = _fdivide(HIDE_OUTSIDE_DEGREE, 2);
       if(degree(theta) > th || pX < 0.0 || pX > pWidth || pY < 0.0 || pY > pHeight){
         return make_float3(0.0, 0.0, 0.0);
       }
