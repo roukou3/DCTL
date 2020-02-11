@@ -35,7 +35,8 @@ DEFINE_UI_PARAMS(DEFISH_COEF_K, defish coef k,      DCTLUI_SLIDER_FLOAT,  0.0, -
 
 // r = 1.0 at theta eq theta_max
 __DEVICE__ float theta2radius(const float theta, const float theta_max, const float k){
-  const float x = _fminf(k * theta, _fdivide(PI, 2));
+  const float PI2 = _fdivide(PI, 2);
+  const float x = _fminf(k * theta, PI2);
   const float y = k * theta_max;
   if (k > 0){
     return _tanf(x) / _tanf(y);
