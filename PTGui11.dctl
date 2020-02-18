@@ -6,9 +6,9 @@
 #include "defisheye.h"
 
 DEFINE_UI_PARAMS(CIRCLE_ADJ,   adjustment mode,  DCTLUI_CHECK_BOX, 1)
-DEFINE_UI_PARAMS(CIRCLE_CENTX, adjust:center x, DCTLUI_SLIDER_FLOAT,  0.0,   -2.0,  2.0, 0.01) //-0.1
-DEFINE_UI_PARAMS(CIRCLE_CENTY, adjust:center y, DCTLUI_SLIDER_FLOAT,  0.0,   -2.0,  2.0, 0.01) //-0.7
-DEFINE_UI_PARAMS(CIRCLE_RAD,   adjust:radius,   DCTLUI_SLIDER_FLOAT, 29.0,   0.0, 75.0, 0.01)
+DEFINE_UI_PARAMS(CIRCLE_CENTX, adjust:center x, DCTLUI_SLIDER_FLOAT,  0.0,   -3.0,  3.0, 0.01)
+DEFINE_UI_PARAMS(CIRCLE_CENTY, adjust:center y, DCTLUI_SLIDER_FLOAT,  0.0,   -3.0,  3.0, 0.01)
+DEFINE_UI_PARAMS(CIRCLE_RAD,   adjust:radius,   DCTLUI_SLIDER_FLOAT, 29.0,   25.0, 80.0, 0.01)
 DEFINE_UI_PARAMS(PIX_ASPECT,   adjust:aspect,   DCTLUI_SLIDER_FLOAT,  1.0,    1.0,  2.0, 0.01)
 DEFINE_UI_PARAMS(FOCAL_LENGTH, focal length log2,DCTLUI_SLIDER_FLOAT, 2.322,  2.0,  5.0, 0.1) //2^2.322=5mm
 DEFINE_UI_PARAMS(INTERP,       use bicubic,      DCTLUI_CHECK_BOX, 1)
@@ -35,15 +35,16 @@ DEFINE_UI_PARAMS(DEFISH_COEF_K, defish coef k,      DCTLUI_SLIDER_FLOAT,  0.0, -
 
 // r = 1.0 at theta eq theta_max
 __DEVICE__ float theta2radius(const float theta, const float theta_max, const float k){
-  const float PI2 = _fdivide(PI, 2);
-  const float x = _fminf(k * theta, PI2);
+  const float pi = PI;
+  const float pi2 = _fdivide(pi, 2);
+  const float x = _fminf(k * theta, pi2);
   const float y = k * theta_max;
   if (k > 0){
-    return _tanf(x) / _tanf(y);
+    return _fdivide(_tanf(x), _tanf(y));
   }else if(k < 0){
-    return _sinf(x) / _sinf(y);
+    return _fdivide(_sinf(x), _sinf(y));
   }
-  return theta / theta_max;
+  return _fdivide(theta, theta_max);
 }
 
 __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTURE__ p_TexR, __TEXTURE__ p_TexG, __TEXTURE__ p_TexB)
