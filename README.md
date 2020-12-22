@@ -39,9 +39,9 @@ Supported Lenses:
 
 ### Parameters
 
-* adjuctment mode - Transit to the mode to adjust the position and size of the image circle.
+* adjustment mode - Transit to the mode to adjust the position and size of the image circle.
 * adjustment:center x, centery y, radius, aspect - Adjust the position, size and aspect of the image circle with each parameter.
-* focal length log2 - Specify the logarithmic value of the full-size equivalent focal length. For example, 5 mm is 2.3219. The reason for logarithm is to zoom in smoothly.
+* focal length log2 - Specify the logarithmic value of the full-size equivalent focal length. For example, 5 mm is 2.3219(2^2.322=5). The reason for logarithm is to zoom in smoothly.
 * pan, tilt, rotate - Adjust the camera's 3 axes.
 * defish rate - Deform continuously before and after fisheye correction.
 * pan 2, tilt 2, rotate 2 - Additional camera's 3 axes for camera move.
@@ -52,7 +52,7 @@ Supported Lenses:
 
 ## Requirement
 
-Blackmagic Design DaVinci Resolve Studio 16
+Blackmagic Design DaVinci Resolve Studio 16, 17b6
 
 DCTL does not work with free version of DaVinci Resolve.
 
