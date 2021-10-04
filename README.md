@@ -52,14 +52,18 @@ Supported Lenses:
 
 ## Requirement
 
-Blackmagic Design DaVinci Resolve Studio 16, 17b6
+Blackmagic Design DaVinci Resolve Studio 16, 17
 
 DCTL does not work with free version of DaVinci Resolve.
 
-## About shooting settings
+## TIPS
 
-For movie shooting, IBIS(In Body Image Stabilization) should be turned off.
-And for GH 5, anamorphic(4:3) 6K is preferable.
+- If the aspect of the timeline is different from the clip, [see here](https://github.com/roukou3/DCTL/issues/3#issuecomment-933454757).
+
+- About shooting settings
+
+   For movie shooting, IBIS(In Body Image Stabilization) should be turned off.
+   And for GH 5, anamorphic(4:3) 6K is preferable.
 
 ## Licence
 
