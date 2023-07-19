@@ -1,5 +1,5 @@
 
-#define PI (3.14159265)
+#define PI (3.14159265358979323846)
 
 __DEVICE__ float radian(const float degree){
   const float _t = 180;
