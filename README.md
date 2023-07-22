@@ -1,5 +1,4 @@
-Fisheye correction in DCTL
-====
+# Fisheye correction in DCTL
 
 ## Description
 
@@ -68,3 +67,9 @@ DCTL does not work with free version of DaVinci Resolve.
 ## Licence
 
 MIT License
+
+## Related
+
+- [DeFisheye (Qt)](https://github.com/Franticware/DCTL-Qt)
+
+    [Franticware](https://github.com/Franticware) have created a standalone qt app which correct fisheye photos (not videos) without DaVinci resolve.
